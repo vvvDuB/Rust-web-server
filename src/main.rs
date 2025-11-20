@@ -14,13 +14,23 @@ fn main() {
 }
 
 fn render_page(mut stream: TcpStream, page: &str) {
-    // TODO: Manage safe file open with 200 or 500
-
-    let status_line = "HTTP/1.1 200 OK";
-    let content = fs::read_to_string(page).unwrap();
-    let len = content.len();
-
-    let resp = format!("{status_line}\r\nContent-Length: {len}\r\n\r\n{content}");
+    let resp: String;
+    let content = fs::read_to_string(page);
+    match content {
+        Ok(page) => { 
+            let status_line = "HTTP/1.1 200 OK";
+            let len = page.len();
+            resp = format!("{status_line}\r\nContent-Length: {len}\r\n\r\n{page}");
+        } 
+        Err(msg) => {
+            let status_line = "HTTP/1.1 500 Internal Server Error";
+            let error = format!("I cannot read {page}: {msg}");
+            let len = error.len();
+            resp = format!("{status_line}\r\nContent-Length: {len}\r\n\r\n{error}");
+        }
+    }
+    
+    println!("{:?}", resp);
     stream.write_all(resp.as_bytes()).unwrap();
 }
 
@@ -40,6 +50,9 @@ fn handle_stream(mut stream: TcpStream) {
         .map(|line| line.split_whitespace().nth(1).unwrap_or("/"))
         .unwrap_or("/");          
     
+    let date = Local::now().format("%d/%m/%y - %H:%M:%S").to_string();
+    println!("{} -- {:?} {} - {}", peer, date, header[0], header[2]);
+    
     match resource.trim_start_matches('/') {
         "" | "index.html" => render_page(stream, "index.html"),
         "favicon.io" => render_page(stream, "favicon.io"),
@@ -48,11 +61,7 @@ fn handle_stream(mut stream: TcpStream) {
             stream.write_all(resp.as_bytes()).unwrap();
         },
     }
-   
-    let date = Local::now().format("%d/%m/%y - %H:%M:%S").to_string();
-    println!("{} -- {:?} {} - {}", peer, date, header[0], header[2]);
 
     // TODO: Prevent path traversal
-    // TODO: Handles malformed requests
 }
 
