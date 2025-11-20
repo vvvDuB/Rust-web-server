@@ -16,24 +16,26 @@ fn main() {
 fn render_page(mut stream: TcpStream, page: &str) {
     let resp: String;
     let content = fs::read_to_string(page);
+    let status: &str;
     match content {
         Ok(page) => { 
             let status_line = "HTTP/1.1 200 OK";
+            status = status_line;
             let len = page.len();
             resp = format!("{status_line}\r\nContent-Length: {len}\r\n\r\n{page}");
         } 
         Err(msg) => {
             let status_line = "HTTP/1.1 500 Internal Server Error";
-            let error = format!("I cannot read {page}: {msg}");
+            status = status_line;
+            let error = format!("I cannot read {page}: {msg}\n");
             let len = error.len();
             resp = format!("{status_line}\r\nContent-Length: {len}\r\n\r\n{error}");
         }
     }
     
-    println!("{:?}", resp);
+    println!("{} -- {}", status, page);
     stream.write_all(resp.as_bytes()).unwrap();
 }
-
 
 fn handle_stream(mut stream: TcpStream) {
     let reader = BufReader::new(&stream);
@@ -61,7 +63,5 @@ fn handle_stream(mut stream: TcpStream) {
             stream.write_all(resp.as_bytes()).unwrap();
         },
     }
-
-    // TODO: Prevent path traversal
 }
 
