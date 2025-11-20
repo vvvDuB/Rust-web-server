@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{BufRead, BufReader, Write}; 
+use chrono::prelude::*;
 use std::net::{TcpListener, TcpStream};
 
 fn main() {
@@ -26,27 +27,31 @@ fn render_page(mut stream: TcpStream, page: &str) {
 
 fn handle_stream(mut stream: TcpStream) {
     let reader = BufReader::new(&stream);
+    let peer = &reader.get_ref().peer_addr().unwrap().ip();
+
     let http_request: Vec<_> = reader.lines()
         .map(|res| res.unwrap())
         .take_while(|line| !line.is_empty())
         .collect();
-    
+
+    let header = &http_request;
     let resource = http_request
         .get(0)                   
         .map(|line| line.split_whitespace().nth(1).unwrap_or("/"))
         .unwrap_or("/");          
-           
+    
     match resource.trim_start_matches('/') {
         "" | "index.html" => render_page(stream, "index.html"),
-        "flag.html" => render_page(stream, "flag.html"),
         "favicon.io" => render_page(stream, "favicon.io"),
         _ => {
             let resp = format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\n\r\n");
             stream.write_all(resp.as_bytes()).unwrap();
         },
     }
+   
+    let date = Local::now().format("%d/%m/%y - %H:%M:%S").to_string();
+    println!("{} -- {:?} {} - {}", peer, date, header[0], header[2]);
 
-    // TODO: Add event log in console
     // TODO: Prevent path traversal
     // TODO: Handles malformed requests
 }
